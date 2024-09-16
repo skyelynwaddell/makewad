@@ -1,6 +1,4 @@
-#!/usr/bin/env ruby
-# frozen_string_literal: true
-
+require 'tk'
 require 'stringio'
 require 'chunky_png'
 require 'tty-progressbar'
@@ -84,8 +82,9 @@ module MakeWad
     end
   end
 
-  # A texture of 8-bit values corresponding to the index of the TextureWad palette
-  class Texture
+
+   # A texture of 8-bit values corresponding to the index of the TextureWad palette
+   class Texture
     attr_accessor :offset
     attr_reader :width, :height, :name, :canvas, :mipmap_size
 
@@ -190,6 +189,7 @@ module MakeWad
     end
   end
 
+
   # A palette of 256 24-bit colors
   class Palette
     attr_accessor :offset
@@ -254,8 +254,8 @@ module MakeWad
       buf.string
     end
 
-    # RGB representation of a pixel
-    class PaletteColor
+     # RGB representation of a pixel
+     class PaletteColor
       attr_reader :r, :g, :b, :to_i
 
       def initialize(red, green, blue)
@@ -267,34 +267,140 @@ module MakeWad
     end
   end
 
-  class CLI
-    def usage
-      puts "Usage: #{$PROGRAM_NAME}: <in folder> <in palette> <out wad>"
-    end
-
-    def process_args
-      @in_directory = ARGV[0]
-      @in_palette = ARGV[1]
-      @out_wad = ARGV[2]
-      abort %(Palette file "#{@inpalette}" does not exist) unless File.exist?(@in_palette)
-      abort "Palette is incorrect size, should be 768 bytes" unless File.size(@in_palette) == 768
-      abort %(Texture directory "#{@in_directory}" does not exist) unless Dir.exist?(@in_directory)
-    end
-
-    def run
-      if ARGV.length != 3
-        usage
-        abort
-      end
-      process_args
-
-      palette = Palette.from_file(@in_palette)
-      wad = TextureWad.new(palette)
-      wad.add_directory(@in_directory)
-      wad.to_file(@out_wad)
-      puts %(Texture WAD exported to "#{@out_wad}" successfully)
-    end
-  end
 end
 
-MakeWad::CLI.new.run
+# --- GUI Setup ---
+
+root = TkRoot.new do
+  title "MakeWad" 
+  background '#1e1e1e'
+end
+
+defaulttexuredir = "textures"
+defaultpalettedir = "palettes/palette.lmp"
+defaultoutputdir = "textures.wad"
+
+$texturedir = TkVariable.new(defaulttexuredir)
+$palettedir = TkVariable.new(defaultpalettedir)
+$outputdir = TkVariable.new(defaultoutputdir)
+
+# Set up the style for a Quake-like theme
+def quake_style(widget)
+  widget.configure(
+    'background' => '#1e1e1e', # Dark gray background
+    'foreground' => '#e0e0e0', # Light gray text
+    'borderwidth' => 2,
+    'relief' => 'raised'
+  )
+end
+
+# Font style for Quake look
+quake_font = TkFont.new :family => 'Courier New', :size => 12, :weight => 'bold'
+
+# Create labels and text fields
+lblTitle = Tk::Tile::Label.new(root) do
+  text 'MAKEWAD'
+  font quake_font
+  background '#1e1e1e'
+  foreground '#e0e0e0'
+end.grid
+
+lblDescription = Tk::Tile::Label.new(root) do
+  text 'Create a Quake1 WAD from a folder of PNG files'
+  font quake_font
+  background '#1e1e1e'
+  foreground '#e0e0e0'
+end.grid
+
+lblTextures = TkLabel.new(root) { text 'Textures:' }
+lblPalette = TkLabel.new(root) { text 'Palette:' }
+lblOutputWad = TkLabel.new(root) { text 'Output WAD:' }
+
+txtTextures = TkEntry.new(root) { textvariable $texturedir; width 50 }
+txtPalette = TkEntry.new(root) { textvariable $palettedir; width 50 }
+txtOutputWad = TkEntry.new(root) { textvariable $outputdir; width 50 }
+
+# Apply Quake style to labels and text fields
+[ lblTextures, lblPalette, lblOutputWad ].each { |label| quake_style(label) }
+[ txtTextures, txtPalette, txtOutputWad ].each { |entry| quake_style(entry) }
+
+# Create buttons
+btnTextures = TkButton.new(root) {
+  text 'Select Texture Folder'
+  command {
+    selected_texture_dir = Tk::chooseDirectory
+    $texturedir.value = selected_texture_dir unless selected_texture_dir.empty?
+  }
+}
+quake_style(btnTextures)
+
+btnPalette = TkButton.new(root) {
+  text 'Select Palette'
+  command {
+    selected_palette = Tk::getOpenFile('filetypes' => [['LMP files', '.lmp'], ['All files', '.*']])
+    $palettedir.value = selected_palette unless selected_palette.empty?
+  }
+}
+quake_style(btnPalette)
+
+btnOutputWad = TkButton.new(root) {
+  text 'Select Output WAD'
+  command {
+    selected_output = Tk::getSaveFile('filetypes' => [['WAD files', '.wad']])
+    $outputdir.value = selected_output unless selected_output.empty?
+  }
+}
+quake_style(btnOutputWad)
+
+# --- Function to Make the WAD ---
+def make_wad(texture_dir, palette_file, output_wad)
+  palette = MakeWad::Palette.from_file(palette_file)
+  wad = MakeWad::TextureWad.new(palette)
+  wad.add_directory(texture_dir)
+  wad.to_file(output_wad)
+
+  # Open the directory where the wad was just saved
+  system("explorer \"#{output_wad}\"")
+
+  puts "WAD successfully created at #{output_wad}"
+end
+
+# Button to trigger WAD creation
+btnMakeWad = TkButton.new(root) {
+  text 'Make WAD'
+  command {
+    texture_dir = $texturedir.value
+    palette_file = $palettedir.value
+    output_wad = $outputdir.value
+
+    # Simple validation
+    if texture_dir.empty? || palette_file.empty? || output_wad.empty?
+      puts "Please fill in all fields before proceeding."
+    else
+      # Call the make_wad function with GUI inputs
+      make_wad(texture_dir, palette_file, output_wad)
+    end
+  }
+}
+quake_style(btnMakeWad)
+
+# --- Layout using grid ---
+lblTitle.grid('row' => 0, 'column' => 0, 'columnspan' => 3, 'padx' => 10, 'pady' => 5)
+lblDescription.grid('row' => 1, 'column' => 0, 'columnspan' => 3, 'padx' => 10, 'pady' => 0)
+
+lblTextures.grid('row' => 2, 'column' => 0, 'padx' => 10, 'pady' => 10)
+txtTextures.grid('row' => 2, 'column' => 1, 'padx' => 10, 'pady' => 10)
+btnTextures.grid('row' => 2, 'column' => 2, 'padx' => 10, 'pady' => 10)
+
+lblPalette.grid('row' => 3, 'column' => 0, 'padx' => 10, 'pady' => 10)
+txtPalette.grid('row' => 3, 'column' => 1, 'padx' => 10, 'pady' => 10)
+btnPalette.grid('row' => 3, 'column' => 2, 'padx' => 10, 'pady' => 10)
+
+lblOutputWad.grid('row' => 4, 'column' => 0, 'padx' => 10, 'pady' => 10)
+txtOutputWad.grid('row' => 4, 'column' => 1, 'padx' => 10, 'pady' => 10)
+btnOutputWad.grid('row' => 4, 'column' => 2, 'padx' => 10, 'pady' => 10)
+
+btnMakeWad.grid('row' => 5, 'column' => 0, 'columnspan' => 3, 'padx' => 10, 'pady' => 20)
+
+# Start the Tk main event loop
+Tk.mainloop

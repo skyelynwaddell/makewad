@@ -5,3 +5,5 @@ source "https://rubygems.org"
 gem "chunky_png", "~> 1.4"
 
 gem "tty-progressbar", "~> 0.18.2"
+
+gem "ini"
