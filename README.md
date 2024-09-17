@@ -17,3 +17,5 @@ A default palette, texture folder, and .wad file have been setup for you, you co
 3. Press Make Wad
 
 Enjoy 👽
+
+![image](https://github.com/user-attachments/assets/a0f4802b-e750-4e7b-8372-3334f758ac02)
